@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+set -e
+
+if [ "x${1}" == "x" ]; then
+    echo -e "\nUsage:\n\t$(basename ${0}) /path/to/sdcard/boot/partition\n" >&2
+    exit 1
+fi
+
+WD=$(realpath $(dirname ${0}))
+SD_BOOT=$(realpath ${1})
+
+if [ ! -d ${SD_BOOT} ]; then
+    echo "\"${SD_BOOT}\" is not a directory" >&2
+    exit 1
+fi
+
+#########################################################################################
+echo "1. Setup wpa_supplicant" >&2
+
+read -p "wifi ssid: " ssid
+read -p "wifi pass: " pass
+
+if [ "x${ssid}" == "x" ]; then
+    echo "ssid is required to configure wifi on target rpi"
+    exit 1
+fi
+
+cp ${WD}/wpa_supplicant.conf ${SD_BOOT}
+
+sed -e "s/ssid=\"\"/ssid=\"${ssid}\"/" -e "s/psk=\"\"/psk=\"${pass}\"/" -i ${SD_BOOT}/wpa_supplicant.conf
+
+#########################################################################################
+echo "2. Enable sshd on next rpi boot" >&2
+
+touch ${SD_BOOT}/ssh
+
+#########################################################################################
+echo "Done" >&2

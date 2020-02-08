@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+set -ex
+
+if [ "x${1}" == "x" ]; then
+    echo -e "\nUsage:\n\t$(basename ${0}) <raspberry pi target ip address>\n" >&2
+    exit 1
+fi
+
+WD=$(realpath $(dirname ${0}))
+TARGET=${1}
+SSH_KEY=${2:-"${HOME}/.ssh/id_rsa"}
+
+CHECK_CMD="cat /etc/issue.net"
+UPGRADE_CMD="sudo apt update && sudo apt upgrade -y && sudo apt install docker.io -y"
+MIMIC_DEBIAN_CMD="test -e ~/os-release.bak && exit || cp /etc/os-release ~/os-release.bak && sudo sed -e 's/^ID=raspbian$/ID=debian/' -i /etc/os-release"
+CALL_THE_CHTULCHU_CMD="test -e /usr/bin/dockerd || sudo ln -s \$(which dockerd) /usr/bin/dockerd"
+
+step() {
+    local title=${1} cmd=${2}
+
+    echo ${title}
+    if ! ssh pi@${TARGET} "${cmd}"; then
+        echo "Can not run \`${cmd}\` via ssh on ${TARGET}" >&2
+        exit 1
+    fi
+}
+
+#########################################################################################
+step "0. Check ssh connectivity to ${TARGET}" "${CHECK_CMD}"
+step "1. Install packages on target" "${UPGRADE_CMD}"
+step "2. Make target looks like Ubuntu driven by systemd for docker-machine" "${MIMIC_DEBIAN_CMD}"
+step "3. Create /usr/bin/dockerd symlink to the glory of Chtulhu \\(*_* )/" "${CALL_THE_CHTULCHU_CMD}"
+
+#########################################################################################
+echo "4. Create docker-machine on ${TARGET}"
+docker-machine create --driver generic \
+    --generic-ssh-user=pi \
+    --generic-ip-address=${TARGET} \
+    --generic-ssh-key=${SSH_KEY} \
+    acs-master
+
+#########################################################################################
+echo "Done" >&2
